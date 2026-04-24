@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<title>Dashboard Quantitativo</title>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+body { margin:0; font-family:Arial; background:#0b1220; color:#e5e7eb; }
+.container { max-width:1300px; margin:auto; padding:20px; }
+h1,h2 { text-align:center; }
+
+.cards {
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+    gap:15px;
+}
+
+.card {
+    background:#111827;
+    padding:15px;
+    border-radius:10px;
+    text-align:center;
+    position:relative;
+}
+
+.tooltip {
+    position:absolute;
+    top:8px;
+    right:10px;
+    background:#1f2937;
+    padding:4px 8px;
+    border-radius:50%;
+    cursor:pointer;
+}
+
+.tooltip-text {
+    display:none;
+    position:absolute;
+    top:25px;
+    right:0;
+    background:#111827;
+    padding:8px;
+    border-radius:6px;
+    font-size:12px;
+}
+
+.tooltip:hover .tooltip-text { display:block; }
+
+canvas { background:#111827; border-radius:10px; margin-top:20px; }
+
+.filtros { text-align:center; margin:20px 0; }
+
+select,input,button {
+    padding:6px; margin:5px; border-radius:6px; border:none;
+}
+
+table {
+    width:100%;
+    border-collapse:collapse;
+    margin-top:30px;
+    background:#111827;
+}
+
+th,td {
+    padding:8px;
+    text-align:center;
+    border-bottom:1px solid #1f2937;
+}
+
+th { background:#020617; }
+
+.pos { color:#22c55e; }
+.neg { color:#ef4444; }
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>📊 Dashboard Quantitativo (Pontos)</h1>
+
+<div class="cards">
+
+<div class="card"><div class="tooltip">?<div class="tooltip-text">Resultado total</div></div><h3>Equity</h3><p id="equity"></p></div>
+<div class="card"><div class="tooltip">?<div class="tooltip-text">Maior queda</div></div><h3>Drawdown</h3><p id="dd"></p></div>
+<div class="card"><div class="tooltip">?<div class="tooltip-text">% dias positivos</div></div><h3>Win Rate</h3><p id="wr"></p></div>
+<div class="card"><div class="tooltip">?<div class="tooltip-text">Relação ganho/perda</div></div><h3>Payoff</h3><p id="payoff"></p></div>
+<div class="card"><div class="tooltip">?<div class="tooltip-text">Sequência ganhos</div></div><h3>Seq Gain</h3><p id="sg"></p></div>
+<div class="card"><div class="tooltip">?<div class="tooltip-text">Sequência perdas</div></div><h3>Seq Loss</h3><p id="sl"></p></div>
+
+</div>
+
+<div class="filtros">
+<select id="mes"></select>
+<input type="date" id="ini">
+<input type="date" id="fim">
+<button onclick="filtrar()">Filtrar</button>
+</div>
+
+<h2>📈 Equity + Drawdown</h2>
+<canvas id="grafico"></canvas>
+
+<h2>📅 Diário</h2>
+<table><thead><tr><th>Data</th><th>Pontos</th></tr></thead><tbody id="diario"></tbody></table>
+
+<h2>📆 Semanal</h2>
+<table><thead><tr><th>Mês</th><th>Semana</th><th>Pontos</th></tr></thead><tbody id="semanal"></tbody></table>
+
+<h2>📊 Mensal</h2>
+<table><thead><tr><th>Mês</th><th>Pontos</th></tr></thead><tbody id="mensal"></tbody></table>
+
+</div>
+
+<script>
+
+const dados = [
+["04/12/2025",-292.94],["05/12/2025",-236.34],["09/12/2025",-110.67],
+["10/12/2025",-295.00],["11/12/2025",295.27],["12/12/2025",235.20],
+["15/12/2025",-287.33],["17/12/2025",351.00],["18/12/2025",7.67],
+["19/12/2025",167.66],["22/12/2025",171.00],["23/12/2025",7.67],
+["30/12/2025",1.00],
+
+["05/01/2026",12.00],["06/01/2026",167.66],["08/01/2026",7.67],
+["14/01/2026",341.00],["20/01/2026",341.00],["21/01/2026",15.33],
+["22/01/2026",7.67],["26/01/2026",771.92],["27/01/2026",-166.34],
+["28/01/2026",226.17],["29/01/2026",266.33],
+
+["03/02/2026",307.60],["06/02/2026",183.53],["09/02/2026",-345.67],
+["10/02/2026",-384.00],["11/02/2026",-45.66],["12/02/2026",-163.00],
+["13/02/2026",-193.00],
+
+["05/03/2026",394.00],["06/03/2026",218.00],["09/03/2026",230.50],
+["10/03/2026",23.00],["11/03/2026",361.00],["12/03/2026",191.00],
+["16/03/2026",353.00],["17/03/2026",232.00],["18/03/2026",259.00],
+["19/03/2026",591.20],["20/03/2026",619.00],["23/03/2026",518.00],
+["24/03/2026",557.00],["25/03/2026",360.66],["26/03/2026",630.00],
+["27/03/2026",684.50],["30/03/2026",501.00],["31/03/2026",7.00],
+
+["01/04/2026",351.00],["02/04/2026",1008.00],
+["14/04/2026",20.00],["15/04/2026",415.00],["16/04/2026",605.00],
+["17/04/2026",370.00],["20/04/2026",540.00],["22/04/2026",1073.00],
+["23/04/2026",314.00],["24/04/2026",434.50]
+];
+
+function parse(d){
+    let [dia,mes,ano]=d.split('/');
+    return new Date(ano,mes-1,dia);
+}
+
+function getSemana(date){
+    let inicio = new Date(date.getFullYear(), date.getMonth(), 1);
+    let dias = Math.floor((date - inicio) / (1000*60*60*24));
+    return Math.floor(dias / 7) + 1;
+}
+
+// filtro mês
+const mesSelect = document.getElementById("mes");
+mesSelect.innerHTML = `<option value="todos">Todos</option>`;
+[...new Set(dados.map(d=>{
+    let [_,m,a]=d[0].split('/');
+    return `${m}/${a}`;
+}))].forEach(m=>mesSelect.innerHTML += `<option>${m}</option>`);
+
+let chart;
+
+function render(arr){
+
+    let soma=0, equity=[], ddArr=[], topo=0;
+
+    let wins=0, losses=0, gain=0, loss=0;
+    let sg=0, sl=0, maxSG=0, maxSL=0;
+
+    let semanal={}, mensal={};
+
+    const diario = document.getElementById("diario");
+    const sem = document.getElementById("semanal");
+    const mes = document.getElementById("mensal");
+
+    diario.innerHTML=""; sem.innerHTML=""; mes.innerHTML="";
+
+    arr.forEach(d=>{
+        let v=d[1];
+        soma+=v;
+        equity.push(soma);
+
+        topo=Math.max(topo,soma);
+        ddArr.push(soma-topo);
+
+        diario.innerHTML += `<tr><td>${d[0]}</td><td class="${v>=0?'pos':'neg'}">${v.toFixed(2)}</td></tr>`;
+
+        let [dia,m,a]=d[0].split('/');
+        let chaveMes=`${m}/${a}`;
+        let semana=getSemana(parse(d[0]));
+
+        if(!mensal[chaveMes]) mensal[chaveMes]=0;
+        mensal[chaveMes]+=v;
+
+        if(!semanal[chaveMes]) semanal[chaveMes]={};
+        if(!semanal[chaveMes][semana]) semanal[chaveMes][semana]=0;
+        semanal[chaveMes][semana]+=v;
+
+        if(v>=0){wins++; gain+=v; sg++; sl=0;}
+        else {losses++; loss+=v; sl++; sg=0;}
+
+        maxSG=Math.max(maxSG,sg);
+        maxSL=Math.max(maxSL,sl);
+    });
+
+    Object.keys(semanal).forEach(m=>{
+        Object.keys(semanal[m]).forEach(s=>{
+            let v=semanal[m][s];
+            sem.innerHTML += `<tr><td>${m}</td><td>Semana ${s}</td><td class="${v>=0?'pos':'neg'}">${v.toFixed(2)}</td></tr>`;
+        });
+    });
+
+    Object.keys(mensal).forEach(m=>{
+        let v=mensal[m];
+        mes.innerHTML += `<tr><td>${m}</td><td class="${v>=0?'pos':'neg'}">${v.toFixed(2)}</td></tr>`;
+    });
+
+    let dd=Math.min(...ddArr);
+    let wr=wins?wins/(wins+losses)*100:0;
+    let payoff=(wins&&losses)?(gain/wins)/Math.abs(loss/losses):0;
+
+    document.getElementById("equity").innerText=soma.toFixed(0);
+    document.getElementById("dd").innerText=dd.toFixed(0);
+    document.getElementById("wr").innerText=wr.toFixed(1)+"%";
+    document.getElementById("payoff").innerText=payoff.toFixed(2);
+    document.getElementById("sg").innerText=maxSG;
+    document.getElementById("sl").innerText=maxSL;
+
+    if(chart) chart.destroy();
+
+    chart=new Chart(document.getElementById("grafico"),{
+        type:'line',
+        data:{
+            labels:arr.map(d=>d[0]),
+            datasets:[
+                {label:'Equity',data:equity,borderWidth:2},
+                {label:'Drawdown',data:ddArr,borderWidth:2}
+            ]
+        }
+    });
+}
+
+function filtrar(){
+    let m=mesSelect.value;
+    let ini=document.getElementById("ini").value;
+    let fim=document.getElementById("fim").value;
+
+    let arr=dados;
+
+    if(m!=="todos"){
+        arr=arr.filter(d=>{
+            let [_,mes,ano]=d[0].split('/');
+            return `${mes}/${ano}`===m;
+        });
+    }
+
+    if(ini) arr=arr.filter(d=>parse(d[0])>=new Date(ini));
+    if(fim) arr=arr.filter(d=>parse(d[0])<=new Date(fim));
+
+    render(arr);
+}
+
+render(dados);
+
+</script>
+
+</body>
+</html>
