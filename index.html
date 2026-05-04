@@ -83,14 +83,12 @@ th { background:#020617; }
 <h1>📊 Dashboard Quantitativo (Pontos)</h1>
 
 <div class="cards">
-
-<div class="card"><div class="tooltip">?<div class="tooltip-text">Resultado total</div></div><h3>Pontuação Total</h3><p id="equity"></p></div>
-<div class="card"><div class="tooltip">?<div class="tooltip-text">Maior queda</div></div><h3>Drawdown</h3><p id="dd"></p></div>
-<div class="card"><div class="tooltip">?<div class="tooltip-text">% dias positivos</div></div><h3>Win Rate</h3><p id="wr"></p></div>
-<div class="card"><div class="tooltip">?<div class="tooltip-text">Relação ganho/perda</div></div><h3>Payoff</h3><p id="payoff"></p></div>
-<div class="card"><div class="tooltip">?<div class="tooltip-text">Sequência ganhos</div></div><h3>Seq Gain</h3><p id="sg"></p></div>
-<div class="card"><div class="tooltip">?<div class="tooltip-text">Sequência perdas</div></div><h3>Seq Loss</h3><p id="sl"></p></div>
-
+<div class="card"><h3>Pontuação Total</h3><p id="equity"></p></div>
+<div class="card"><h3>Drawdown</h3><p id="dd"></p></div>
+<div class="card"><h3>Win Rate</h3><p id="wr"></p></div>
+<div class="card"><h3>Payoff</h3><p id="payoff"></p></div>
+<div class="card"><h3>Seq Gain</h3><p id="sg"></p></div>
+<div class="card"><h3>Seq Loss</h3><p id="sl"></p></div>
 </div>
 
 <div class="filtros">
@@ -142,8 +140,11 @@ const dados = [
 ["01/04/2026",351.00],["02/04/2026",1008.00],
 ["14/04/2026",20.00],["15/04/2026",415.00],["16/04/2026",605.00],
 ["17/04/2026",370.00],["20/04/2026",540.00],["22/04/2026",1073.00],
-["23/04/2026",314.00],["24/04/2026",434.50],["27/04/2026",420.00],["28/04/2026",25.00],["29/04/2026",205.00],["30/04/2026",-372.50],["04/05/2026",160.00]
+["23/04/2026",314.00],["24/04/2026",434.50],
+["27/04/2026",420.00],["28/04/2026",25.00],
+["29/04/2026",205.00],["30/04/2026",-372.50],
 
+["04/05/2026",160.00]
 ];
 
 function parse(d){
@@ -170,38 +171,39 @@ let chart;
 function render(arr){
 
     let soma=0, equity=[], ddArr=[], topo=0;
-
     let wins=0, losses=0, gain=0, loss=0;
     let sg=0, sl=0, maxSG=0, maxSL=0;
 
     let semanal={}, mensal={};
 
-    const diario = document.getElementById("diario");
-    const sem = document.getElementById("semanal");
-    const mes = document.getElementById("mensal");
-
-    diario.innerHTML=""; sem.innerHTML=""; mes.innerHTML="";
+    document.getElementById("diario").innerHTML="";
+    document.getElementById("semanal").innerHTML="";
+    document.getElementById("mensal").innerHTML="";
 
     arr.forEach(d=>{
-        let v=d[1];
+        let v = Number(d[1]);
+
+        if (isNaN(v)) {
+            console.error("Erro no dado:", d);
+            return;
+        }
+
         soma+=v;
         equity.push(soma);
 
         topo=Math.max(topo,soma);
         ddArr.push(soma-topo);
 
-        diario.innerHTML += `<tr><td>${d[0]}</td><td class="${v>=0?'pos':'neg'}">${v.toFixed(2)}</td></tr>`;
+        document.getElementById("diario").innerHTML += 
+        `<tr><td>${d[0]}</td><td class="${v>=0?'pos':'neg'}">${v.toFixed(2)}</td></tr>`;
 
-        let [dia,m,a]=d[0].split('/');
+        let [_,m,a]=d[0].split('/');
         let chaveMes=`${m}/${a}`;
         let semana=getSemana(parse(d[0]));
 
-        if(!mensal[chaveMes]) mensal[chaveMes]=0;
-        mensal[chaveMes]+=v;
-
-        if(!semanal[chaveMes]) semanal[chaveMes]={};
-        if(!semanal[chaveMes][semana]) semanal[chaveMes][semana]=0;
-        semanal[chaveMes][semana]+=v;
+        mensal[chaveMes]=(mensal[chaveMes]||0)+v;
+        semanal[chaveMes]=semanal[chaveMes]||{};
+        semanal[chaveMes][semana]=(semanal[chaveMes][semana]||0)+v;
 
         if(v>=0){wins++; gain+=v; sg++; sl=0;}
         else {losses++; loss+=v; sl++; sg=0;}
@@ -210,26 +212,24 @@ function render(arr){
         maxSL=Math.max(maxSL,sl);
     });
 
-    Object.keys(semanal).forEach(m=>{
-        Object.keys(semanal[m]).forEach(s=>{
+    for(let m in semanal){
+        for(let s in semanal[m]){
             let v=semanal[m][s];
-            sem.innerHTML += `<tr><td>${m}</td><td>Semana ${s}</td><td class="${v>=0?'pos':'neg'}">${v.toFixed(2)}</td></tr>`;
-        });
-    });
+            document.getElementById("semanal").innerHTML +=
+            `<tr><td>${m}</td><td>Semana ${s}</td><td class="${v>=0?'pos':'neg'}">${v.toFixed(2)}</td></tr>`;
+        }
+    }
 
-    Object.keys(mensal).forEach(m=>{
+    for(let m in mensal){
         let v=mensal[m];
-        mes.innerHTML += `<tr><td>${m}</td><td class="${v>=0?'pos':'neg'}">${v.toFixed(2)}</td></tr>`;
-    });
-
-    let dd=Math.min(...ddArr);
-    let wr=wins?wins/(wins+losses)*100:0;
-    let payoff=(wins&&losses)?(gain/wins)/Math.abs(loss/losses):0;
+        document.getElementById("mensal").innerHTML +=
+        `<tr><td>${m}</td><td class="${v>=0?'pos':'neg'}">${v.toFixed(2)}</td></tr>`;
+    }
 
     document.getElementById("equity").innerText=soma.toFixed(0);
-    document.getElementById("dd").innerText=dd.toFixed(0);
-    document.getElementById("wr").innerText=wr.toFixed(1)+"%";
-    document.getElementById("payoff").innerText=payoff.toFixed(2);
+    document.getElementById("dd").innerText=Math.min(...ddArr).toFixed(0);
+    document.getElementById("wr").innerText=(wins/(wins+losses)*100).toFixed(1)+"%";
+    document.getElementById("payoff").innerText=((gain/wins)/Math.abs(loss/losses)).toFixed(2);
     document.getElementById("sg").innerText=maxSG;
     document.getElementById("sl").innerText=maxSL;
 
