@@ -53,8 +53,12 @@ canvas { background:#111827; border-radius:10px; margin-top:20px; }
 .filtros { text-align:center; margin:20px 0; }
 
 select,input,button {
-    padding:6px; margin:5px; border-radius:6px; border:none;
+    padding:8px; margin:5px; border-radius:6px; border:none;
+    background:#1f2937; color:white;
 }
+
+button { background:#3b82f6; cursor:pointer; }
+button:hover { background:#2563eb; }
 
 table {
     width:100%;
@@ -64,7 +68,7 @@ table {
 }
 
 th,td {
-    padding:8px;
+    padding:10px;
     text-align:center;
     border-bottom:1px solid #1f2937;
 }
@@ -73,6 +77,27 @@ th { background:#020617; }
 
 .pos { color:#22c55e; }
 .neg { color:#ef4444; }
+
+.selector-container {
+    text-align: center;
+    margin-bottom: 10px;
+}
+
+.toggle-btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 20px;
+    cursor: pointer;
+    background: #1f2937;
+    color: #9ca3af;
+    margin: 0 5px;
+    transition: all 0.3s;
+}
+
+.toggle-btn.active {
+    background: #3b82f6;
+    color: white;
+}
 </style>
 </head>
 
@@ -80,10 +105,10 @@ th { background:#020617; }
 
 <div class="container">
 
-<h1>📊 Dashboard Quantitativo (Pontos)</h1>
+<h1>📊 Dashboard Quantitativo</h1>
 
 <div class="cards">
-<div class="card"><h3>Pontuação Total</h3><p id="equity"></p></div>
+<div class="card"><h3>Total</h3><p id="equity"></p></div>
 <div class="card"><h3>Drawdown</h3><p id="dd"></p></div>
 <div class="card"><h3>Win Rate</h3><p id="wr"></p></div>
 <div class="card"><h3>Payoff</h3><p id="payoff"></p></div>
@@ -92,70 +117,335 @@ th { background:#020617; }
 </div>
 
 <div class="filtros">
-<select id="mes"></select>
-<input type="date" id="ini">
-<input type="date" id="fim">
-<button onclick="filtrar()">Filtrar</button>
+    <select id="mes"></select>
+    <input type="date" id="ini">
+    <input type="date" id="fim">
+    <button onclick="filtrar()">Filtrar</button>
 </div>
 
-<h2>📈 Pontuação + Drawdown</h2>
+<div class="selector-container">
+    <button id="btn-pontos" class="toggle-btn active" onclick="setModo('pontos')">Ver em Pontos</button>
+    <button id="btn-reais" class="toggle-btn" onclick="setModo('reais')">Ver em Reais</button>
+</div>
+
+<h2>📈 Performance + Drawdown</h2>
 <canvas id="grafico"></canvas>
 
 <h2>📅 Diário</h2>
-<table><thead><tr><th>Data</th><th>Pontos</th></tr></thead><tbody id="diario"></tbody></table>
+<table>
+    <thead>
+        <tr>
+            <th>Data</th>
+            <th>Pontos</th>
+            <th>Resultado (R$)</th>
+        </tr>
+    </thead>
+    <tbody id="diario"></tbody>
+</table>
 
 <h2>📆 Semanal</h2>
-<table><thead><tr><th>Mês</th><th>Semana</th><th>Pontos</th></tr></thead><tbody id="semanal"></tbody></table>
+<table>
+    <thead>
+        <tr>
+            <th>Mês</th>
+            <th>Semana</th>
+            <th>Pontos</th>
+            <th>Resultado (R$)</th>
+        </tr>
+    </thead>
+    <tbody id="semanal"></tbody>
+</table>
 
 <h2>📊 Mensal</h2>
-<table><thead><tr><th>Mês</th><th>Pontos</th></tr></thead><tbody id="mensal"></tbody></table>
+<table>
+    <thead>
+        <tr>
+            <th>Mês</th>
+            <th>Pontos</th>
+            <th>Resultado (R$)</th>
+        </tr>
+    </thead>
+    <tbody id="mensal"></tbody>
+</table>
 
 </div>
 
 <script>
+// DADOS CORRIGIDOS
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<title>Dashboard Quantitativo</title>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+body { margin:0; font-family:Arial; background:#0b1220; color:#e5e7eb; }
+.container { max-width:1300px; margin:auto; padding:20px; }
+h1,h2 { text-align:center; }
+
+.cards {
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+    gap:15px;
+}
+
+.card {
+    background:#111827;
+    padding:15px;
+    border-radius:10px;
+    text-align:center;
+    position:relative;
+}
+
+.tooltip {
+    position:absolute;
+    top:8px;
+    right:10px;
+    background:#1f2937;
+    padding:4px 8px;
+    border-radius:50%;
+    cursor:pointer;
+}
+
+.tooltip-text {
+    display:none;
+    position:absolute;
+    top:25px;
+    right:0;
+    background:#111827;
+    padding:8px;
+    border-radius:6px;
+    font-size:12px;
+}
+
+.tooltip:hover .tooltip-text { display:block; }
+
+canvas { background:#111827; border-radius:10px; margin-top:20px; }
+
+.filtros { text-align:center; margin:20px 0; }
+
+select,input,button {
+    padding:8px; margin:5px; border-radius:6px; border:none;
+    background:#1f2937; color:white;
+}
+
+button { background:#3b82f6; cursor:pointer; }
+button:hover { background:#2563eb; }
+
+table {
+    width:100%;
+    border-collapse:collapse;
+    margin-top:30px;
+    background:#111827;
+}
+
+th,td {
+    padding:10px;
+    text-align:center;
+    border-bottom:1px solid #1f2937;
+}
+
+th { background:#020617; }
+
+.pos { color:#22c55e; }
+.neg { color:#ef4444; }
+
+.selector-container {
+    text-align: center;
+    margin-bottom: 10px;
+}
+
+.toggle-btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 20px;
+    cursor: pointer;
+    background: #1f2937;
+    color: #9ca3af;
+    margin: 0 5px;
+    transition: all 0.3s;
+}
+
+.toggle-btn.active {
+    background: #3b82f6;
+    color: white;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>📊 Dashboard Quantitativo</h1>
+
+<div class="cards">
+<div class="card"><h3>Total</h3><p id="equity"></p></div>
+<div class="card"><h3>Drawdown</h3><p id="dd"></p></div>
+<div class="card"><h3>Win Rate</h3><p id="wr"></p></div>
+<div class="card"><h3>Payoff</h3><p id="payoff"></p></div>
+<div class="card"><h3>Seq Gain</h3><p id="sg"></p></div>
+<div class="card"><h3>Seq Loss</h3><p id="sl"></p></div>
+</div>
+
+<div class="filtros">
+    <select id="mes"></select>
+    <input type="date" id="ini">
+    <input type="date" id="fim">
+    <button onclick="filtrar()">Filtrar</button>
+</div>
+
+<div class="selector-container">
+    <button id="btn-pontos" class="toggle-btn active" onclick="setModo('pontos')">Ver em Pontos</button>
+    <button id="btn-reais" class="toggle-btn" onclick="setModo('reais')">Ver em Reais</button>
+</div>
+
+<h2>📈 Performance + Drawdown</h2>
+<canvas id="grafico"></canvas>
+
+<h2>📅 Diário</h2>
+<table>
+    <thead>
+        <tr>
+            <th>Data</th>
+            <th>Pontos</th>
+            <th>Resultado (R$)</th>
+        </tr>
+    </thead>
+    <tbody id="diario"></tbody>
+</table>
+
+<h2>📆 Semanal</h2>
+<table>
+    <thead>
+        <tr>
+            <th>Mês</th>
+            <th>Semana</th>
+            <th>Pontos</th>
+            <th>Resultado (R$)</th>
+        </tr>
+    </thead>
+    <tbody id="semanal"></tbody>
+</table>
+
+<h2>📊 Mensal</h2>
+<table>
+    <thead>
+        <tr>
+            <th>Mês</th>
+            <th>Pontos</th>
+            <th>Resultado (R$)</th>
+        </tr>
+    </thead>
+    <tbody id="mensal"></tbody>
+</table>
+
+</div>
+
+<script>
+// DADOS CORRIGIDOS
 const dados = [
-["04/12/2025",304.93],["05/12/2025",248.33],["09/12/2025",116.67],
-["10/12/2025",295.00],["11/12/2025",146.63],["12/12/2025",116.60],
-["15/12/2025",298.33],["17/12/2025",175.00],["18/12/2025",3.33],
-["19/12/2025",83.33],["22/12/2025",85.00],["23/12/2025",3.33],
-["30/12/2025",0.00],
-
-["05/01/2026",5.00],["06/01/2026",83.33],["08/01/2026",3.33],
-["14/01/2026",170.00],["20/01/2026",170.00],["21/01/2026",6.67],
-["22/01/2026",3.33],["26/01/2026",384.96],["27/01/2026",178.33],
-["28/01/2026",115.83],["29/01/2026",131.66],
-
-["03/02/2026",153.30],["06/02/2026",353.27],["09/02/2026",351.67],
-["10/02/2026",400.00],["11/02/2026",66.66],["12/02/2026",180.00],
-["13/02/2026",217.50],
-
-["05/03/2026",195.00],["06/03/2026",295.00],["09/03/2026",380.00],
-["10/03/2026",10.00],["11/03/2026",180.00],["12/03/2026",95.00],
-["16/03/2026",175.00],["17/03/2026",370.00],["18/03/2026",352.50],
-["19/03/2026",563.30],["20/03/2026",307.50],["23/03/2026",257.50],
-["24/03/2026",277.50],["25/03/2026",388.33],["26/03/2026",312.50],
-["27/03/2026",1195.00],["30/03/2026",250.00],["31/03/2026",695.00],
-
-["01/04/2026",172.50],["02/04/2026",502.50],["14/04/2026",10.00],
-["15/04/2026",207.50],["16/04/2026",302.50],["17/04/2026",185.00],
-["20/04/2026",270.00],["22/04/2026",140.00],["23/04/2026",52.50],
-["24/04/2026",177.50],["27/04/2026",212.50],["28/04/2026",12.50],
-["29/04/2026",75.00],["30/04/2026",-404.50],
-
-["04/05/2026",82.50],["05/05/2026",132.50],["06/05/2026",270.00],
-["07/05/2026",232.50],["08/05/2026",-200.00],["11/05/2026",-147.50],
-["12/05/2026",2.50],["13/05/2026",267.50],["15/05/2026",-740.00],
-["18/05/2026",-612.50],["19/05/2026",275.00],["20/05/2026",-432.50],
-["21/05/2026",-345.00],["25/05/2026",-250.00],["26/05/2026",260.00],
-["27/05/2026",-205.00],["28/05/2026",-49.50],
-
-["02/06/2026",195.80],["03/06/2026",80.00],["11/06/2026",180.80],
-["12/06/2026",-250.00],["15/06/2026",216.80],["16/06/2026",222.50],
-["17/06/2026",243.70],["18/06/2026",187.50],["19/06/2026",145.00],
-["22/06/2026",-120.00],["23/06/2026",135.40],["24/06/2026",-320.00],
-["25/06/2026",217.08],["29/06/2026",138.30],["30/06/2026",133.32]
+  ["04/12/2025", -301.268, -179],
+  ["05/12/2025", -243.668, -145],
+  ["09/12/2025", -114.334, -206],
+  ["10/12/2025", -297, -177],
+  ["11/12/2025", 146.633, 88],
+  ["12/12/2025", 116.6, 70],
+  ["15/12/2025", -292.667, -175],
+  ["17/12/2025", 175, 105],
+  ["18/12/2025", 3.333, 2],
+  ["19/12/2025", 83.33, 50],
+  ["22/12/2025", 85, 51],
+  ["23/12/2025", 3.333, 2],
+  ["30/12/2025", 0, 0],
+  ["05/01/2026", 4.999, 3],
+  ["06/01/2026", 83.33, 50],
+  ["08/01/2026", 3.333, 2],
+  ["14/01/2026", 170, 102],
+  ["20/01/2026", 170, 102],
+  ["21/01/2026", 6.666, 6],
+  ["22/01/2026", 3.333, 2],
+  ["26/01/2026", 384.96, 231],
+  ["27/01/2026", -172.668, -103],
+  ["28/01/2026", 109.833, 66],
+  ["29/01/2026", 131.663, 79],
+  ["03/02/2026", 153.3, 92],
+  ["06/02/2026", 2.266, 2],
+  ["09/02/2026", -350.334, -209],
+  ["10/02/2026", -392, -234],
+  ["11/02/2026", -55.324, -32],
+  ["12/02/2026", -171.001, -102],
+  ["13/02/2026", -203.5, -162],
+  ["05/03/2026", 195, 234],
+  ["06/03/2026", 44, 54],
+  ["09/03/2026", 23, 101],
+  ["10/03/2026", 10, 12],
+  ["11/03/2026", 180, 216],
+  ["12/03/2026", 95, 76],
+  ["16/03/2026", 175, 205],
+  ["17/03/2026", 29, 36],
+  ["18/03/2026", 51.5, 63],
+  ["19/03/2026", 200.7, 242],
+  ["20/03/2026", 307.5, 369],
+  ["23/03/2026", 257.5, 309],
+  ["24/03/2026", 277.5, 333],
+  ["25/03/2026", 107.33, 130],
+  ["26/03/2026", 312.5, 375],
+  ["27/03/2026", 47, 60],
+  ["30/03/2026", 250, 300],
+  ["31/03/2026", -239, -282],
+  ["01/04/2026", 172.5, 207],
+  ["02/04/2026", 502.5, 603],
+  ["14/04/2026", 10, 12],
+  ["15/04/2026", 207.5, 249],
+  ["16/04/2026", 302.5, 363],
+  ["17/04/2026", 185, 148],
+  ["20/04/2026", 270, 216],
+  ["22/04/2026", 140, 112],
+  ["23/04/2026", 52.5, 42],
+  ["24/04/2026", 177.5, 71],
+  ["27/04/2026", 212.5, 170],
+  ["28/04/2026", 12.5, 10],
+  ["29/04/2026", 75, 82],
+  ["30/04/2026", -405, -324],
+  ["04/05/2026", 82.5, 66],
+  ["05/05/2026", 132.5, 106],
+  ["06/05/2026", 270, 108],
+  ["07/05/2026", 232.5, 93],
+  ["08/05/2026", -200, -80],
+  ["11/05/2026", -147.5, 25],
+  ["12/05/2026", 2.5, 2],
+  ["13/05/2026", 267.5, 107],
+  ["15/05/2026", -740, -294],
+  ["18/05/2026", -612.5, -344],
+  ["19/05/2026", 275, 330],
+  ["20/05/2026", -432.5, -519],
+  ["21/05/2026", -345, -414],
+  ["25/05/2026", -250, -300],
+  ["26/05/2026", 260, 312],
+  ["27/05/2026", -205, -246],
+  ["28/05/2026", -49.5, -21],
+  ["02/06/2026", 195.8, 235],
+  ["03/06/2026", 80, 96],
+  ["11/06/2026", 180.8, 217],
+  ["12/06/2026", -250, -300],
+  ["15/06/2026", 216.8, 347],
+  ["16/06/2026", 222.5, 356],
+  ["17/06/2026", 243.7, 390],
+  ["18/06/2026", 187.5, 300],
+  ["19/06/2026", 145, 87],
+  ["22/06/2026", -120, -192],
+  ["23/06/2026", 135.4, 325],
+  ["24/06/2026", -320, -648],
+  ["25/06/2026", 217.08, 521],
+  ["29/06/2026", 138.3, 332],
+  ["30/06/2026", 133.32, 320]
 ];
+
+let modoAtual = 'pontos'; // 'pontos' ou 'reais'
+let chart;
 
 function parse(d){
     let [dia,mes,ano]=d.split('/');
@@ -168,22 +458,28 @@ function getSemana(date){
     return Math.floor(dias / 7) + 1;
 }
 
-// filtro mês
+function formatCurrency(val) {
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+}
+
+function setModo(modo) {
+    modoAtual = modo;
+    document.getElementById('btn-pontos').classList.toggle('active', modo === 'pontos');
+    document.getElementById('btn-reais').classList.toggle('active', modo === 'reais');
+    filtrar();
+}
+
 const mesSelect = document.getElementById("mes");
-mesSelect.innerHTML = `<option value="todos">Todos</option>`;
+mesSelect.innerHTML = `<option value="todos">Todos os Meses</option>`;
 [...new Set(dados.map(d=>{
     let [_,m,a]=d[0].split('/');
     return `${m}/${a}`;
 }))].forEach(m=>mesSelect.innerHTML += `<option>${m}</option>`);
 
-let chart;
-
 function render(arr){
-
-    let soma=0, equity=[], ddArr=[], topo=0;
+    let somaPts=0, somaReais=0, equity=[], ddArr=[], topo=0;
     let wins=0, losses=0, gain=0, loss=0;
     let sg=0, sl=0, maxSG=0, maxSL=0;
-
     let semanal={}, mensal={};
 
     document.getElementById("diario").innerHTML="";
@@ -191,68 +487,138 @@ function render(arr){
     document.getElementById("mensal").innerHTML="";
 
     arr.forEach(d=>{
-        let v = Number(d[1]);
+        let pts = Number(d[1]);
+        let reais = Number(d[2]);
+        let valorFiltro = modoAtual === 'pontos' ? pts : reais;
 
-        if (isNaN(v)) {
-            console.error("Erro no dado:", d);
-            return;
-        }
+        somaPts += pts;
+        somaReais += reais;
+        
+        let somaAtual = modoAtual === 'pontos' ? somaPts : somaReais;
+        equity.push(somaAtual);
 
-        soma+=v;
-        equity.push(soma);
-
-        topo=Math.max(topo,soma);
-        ddArr.push(soma-topo);
+        topo = Math.max(topo, somaAtual);
+        ddArr.push(somaAtual - topo);
 
         document.getElementById("diario").innerHTML += 
-        `<tr><td>${d[0]}</td><td class="${v>=0?'pos':'neg'}">${v.toFixed(2)}</td></tr>`;
+        `<tr>
+            <td>${d[0]}</td>
+            <td class="${pts>=0?'pos':'neg'}">${pts.toFixed(2)}</td>
+            <td class="${reais>=0?'pos':'neg'}">${formatCurrency(reais)}</td>
+        </tr>`;
 
         let [_,m,a]=d[0].split('/');
         let chaveMes=`${m}/${a}`;
         let semana=getSemana(parse(d[0]));
 
-        mensal[chaveMes]=(mensal[chaveMes]||0)+v;
-        semanal[chaveMes]=semanal[chaveMes]||{};
-        semanal[chaveMes][semana]=(semanal[chaveMes][semana]||0)+v;
+        if(!mensal[chaveMes]) mensal[chaveMes] = {pts:0, reais:0};
+        mensal[chaveMes].pts += pts;
+        mensal[chaveMes].reais += reais;
 
-        if(v>=0){wins++; gain+=v; sg++; sl=0;}
-        else {losses++; loss+=v; sl++; sg=0;}
+        if(!semanal[chaveMes]) semanal[chaveMes] = {};
+        if(!semanal[chaveMes][semana]) semanal[chaveMes][semana] = {pts:0, reais:0};
+        semanal[chaveMes][semana].pts += pts;
+        semanal[chaveMes][semana].reais += reais;
 
-        maxSG=Math.max(maxSG,sg);
-        maxSL=Math.max(maxSL,sl); 
+        if(valorFiltro >= 0){ wins++; gain += valorFiltro; sg++; sl=0; }
+        else { losses++; loss += valorFiltro; sl++; sg=0; }
+
+        maxSG = Math.max(maxSG, sg);
+        maxSL = Math.max(maxSL, sl); 
     });
 
     for(let m in semanal){
         for(let s in semanal[m]){
             let v=semanal[m][s];
             document.getElementById("semanal").innerHTML +=
-            `<tr><td>${m}</td><td>Semana ${s}</td><td class="${v>=0?'pos':'neg'}">${v.toFixed(2)}</td></tr>`;
+            `<tr>
+                <td>${m}</td>
+                <td>Semana ${s}</td>
+                <td class="${v.pts>=0?'pos':'neg'}">${v.pts.toFixed(2)}</td>
+                <td class="${v.reais>=0?'pos':'neg'}">${formatCurrency(v.reais)}</td>
+            </tr>`;
         }
     }
 
     for(let m in mensal){
         let v=mensal[m];
         document.getElementById("mensal").innerHTML +=
-        `<tr><td>${m}</td><td class="${v>=0?'pos':'neg'}">${v.toFixed(2)}</td></tr>`;
+        `<tr>
+            <td>${m}</td>
+            <td class="${v.pts>=0?'pos':'neg'}">${v.pts.toFixed(2)}</td>
+            <td class="${v.reais>=0?'pos':'neg'}">${formatCurrency(v.reais)}</td>
+        </tr>`;
     }
 
-    document.getElementById("equity").innerText=soma.toFixed(0);
-    document.getElementById("dd").innerText=Math.min(...ddArr).toFixed(0);
-    document.getElementById("wr").innerText=(wins/(wins+losses)*100).toFixed(1)+"%";
-    document.getElementById("payoff").innerText=((gain/wins)/Math.abs(loss/losses)).toFixed(2);
-    document.getElementById("sg").innerText=maxSG;
-    document.getElementById("sl").innerText=maxSL;
+    let finalEquity = modoAtual === 'pontos' ? somaPts : somaReais;
+    document.getElementById("equity").innerText = modoAtual === 'pontos' ? finalEquity.toFixed(0) : formatCurrency(finalEquity);
+    document.getElementById("dd").innerText = modoAtual === 'pontos' ? Math.min(...ddArr).toFixed(0) : formatCurrency(Math.min(...ddArr));
+    document.getElementById("wr").innerText = (wins+losses > 0) ? (wins/(wins+losses)*100).toFixed(1)+"%" : "0%";
+    document.getElementById("payoff").innerText = (losses > 0 && wins > 0) ? ((gain/wins)/Math.abs(loss/losses)).toFixed(2) : "0.00";
+    document.getElementById("sg").innerText = maxSG;
+    document.getElementById("sl").innerText = maxSL;
 
     if(chart) chart.destroy();
 
-    chart=new Chart(document.getElementById("grafico"),{
-        type:'line',
-        data:{
-            labels:arr.map(d=>d[0]),
-            datasets:[
-                {label:'Equity',data:equity,borderWidth:2},
-                {label:'Drawdown',data:ddArr,borderWidth:2}
+    chart = new Chart(document.getElementById("grafico"), {
+        type: 'line',
+        data: {
+            labels: arr.map(d=>d[0]),
+            datasets: [
+                {
+                    label: modoAtual === 'pontos' ? 'Equity (Pontos)' : 'Equity (R$)',
+                    data: equity,
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.3
+                },
+                {
+                    label: 'Drawdown',
+                    data: ddArr,
+                    borderColor: '#ef4444',
+                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                    borderWidth: 1,
+                    fill: true,
+                    tension: 0.3
+                }
             ]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    grid: { color: '#1f2937' },
+                    ticks: {
+                        color: '#9ca3af',
+                        callback: function(value) {
+                            return modoAtual === 'reais' ? formatCurrency(value) : value;
+                        }
+                    }
+                },
+                x: {
+                    grid: { color: '#1f2937' },
+                    ticks: { color: '#9ca3af' }
+                }
+            },
+            plugins: {
+                legend: { labels: { color: '#e5e7eb' } },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            if (label) label += ': ';
+                            if (modoAtual === 'reais') {
+                                label += formatCurrency(context.parsed.y);
+                            } else {
+                                label += context.parsed.y.toFixed(2);
+                            }
+                            return label;
+                        }
+                    }
+                }
+            }
         }
     });
 }
@@ -278,7 +644,212 @@ function filtrar(){
 }
 
 render(dados);
+</script>
 
+</body>
+</html>
+
+
+let modoAtual = 'pontos'; // 'pontos' ou 'reais'
+let chart;
+
+function parse(d){
+    let [dia,mes,ano]=d.split('/');
+    return new Date(ano,mes-1,dia);
+}
+
+function getSemana(date){
+    let inicio = new Date(date.getFullYear(), date.getMonth(), 1);
+    let dias = Math.floor((date - inicio) / (1000*60*60*24));
+    return Math.floor(dias / 7) + 1;
+}
+
+function formatCurrency(val) {
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+}
+
+function setModo(modo) {
+    modoAtual = modo;
+    document.getElementById('btn-pontos').classList.toggle('active', modo === 'pontos');
+    document.getElementById('btn-reais').classList.toggle('active', modo === 'reais');
+    filtrar();
+}
+
+const mesSelect = document.getElementById("mes");
+mesSelect.innerHTML = `<option value="todos">Todos os Meses</option>`;
+[...new Set(dados.map(d=>{
+    let [_,m,a]=d[0].split('/');
+    return `${m}/${a}`;
+}))].forEach(m=>mesSelect.innerHTML += `<option>${m}</option>`);
+
+function render(arr){
+    let somaPts=0, somaReais=0, equity=[], ddArr=[], topo=0;
+    let wins=0, losses=0, gain=0, loss=0;
+    let sg=0, sl=0, maxSG=0, maxSL=0;
+    let semanal={}, mensal={};
+
+    document.getElementById("diario").innerHTML="";
+    document.getElementById("semanal").innerHTML="";
+    document.getElementById("mensal").innerHTML="";
+
+    arr.forEach(d=>{
+        let pts = Number(d[1]);
+        let reais = Number(d[2]);
+        let valorFiltro = modoAtual === 'pontos' ? pts : reais;
+
+        somaPts += pts;
+        somaReais += reais;
+        
+        let somaAtual = modoAtual === 'pontos' ? somaPts : somaReais;
+        equity.push(somaAtual);
+
+        topo = Math.max(topo, somaAtual);
+        ddArr.push(somaAtual - topo);
+
+        document.getElementById("diario").innerHTML += 
+        `<tr>
+            <td>${d[0]}</td>
+            <td class="${pts>=0?'pos':'neg'}">${pts.toFixed(2)}</td>
+            <td class="${reais>=0?'pos':'neg'}">${formatCurrency(reais)}</td>
+        </tr>`;
+
+        let [_,m,a]=d[0].split('/');
+        let chaveMes=`${m}/${a}`;
+        let semana=getSemana(parse(d[0]));
+
+        if(!mensal[chaveMes]) mensal[chaveMes] = {pts:0, reais:0};
+        mensal[chaveMes].pts += pts;
+        mensal[chaveMes].reais += reais;
+
+        if(!semanal[chaveMes]) semanal[chaveMes] = {};
+        if(!semanal[chaveMes][semana]) semanal[chaveMes][semana] = {pts:0, reais:0};
+        semanal[chaveMes][semana].pts += pts;
+        semanal[chaveMes][semana].reais += reais;
+
+        if(valorFiltro >= 0){ wins++; gain += valorFiltro; sg++; sl=0; }
+        else { losses++; loss += valorFiltro; sl++; sg=0; }
+
+        maxSG = Math.max(maxSG, sg);
+        maxSL = Math.max(maxSL, sl); 
+    });
+
+    for(let m in semanal){
+        for(let s in semanal[m]){
+            let v=semanal[m][s];
+            document.getElementById("semanal").innerHTML +=
+            `<tr>
+                <td>${m}</td>
+                <td>Semana ${s}</td>
+                <td class="${v.pts>=0?'pos':'neg'}">${v.pts.toFixed(2)}</td>
+                <td class="${v.reais>=0?'pos':'neg'}">${formatCurrency(v.reais)}</td>
+            </tr>`;
+        }
+    }
+
+    for(let m in mensal){
+        let v=mensal[m];
+        document.getElementById("mensal").innerHTML +=
+        `<tr>
+            <td>${m}</td>
+            <td class="${v.pts>=0?'pos':'neg'}">${v.pts.toFixed(2)}</td>
+            <td class="${v.reais>=0?'pos':'neg'}">${formatCurrency(v.reais)}</td>
+        </tr>`;
+    }
+
+    let finalEquity = modoAtual === 'pontos' ? somaPts : somaReais;
+    document.getElementById("equity").innerText = modoAtual === 'pontos' ? finalEquity.toFixed(0) : formatCurrency(finalEquity);
+    document.getElementById("dd").innerText = modoAtual === 'pontos' ? Math.min(...ddArr).toFixed(0) : formatCurrency(Math.min(...ddArr));
+    document.getElementById("wr").innerText = (wins+losses > 0) ? (wins/(wins+losses)*100).toFixed(1)+"%" : "0%";
+    document.getElementById("payoff").innerText = (losses > 0 && wins > 0) ? ((gain/wins)/Math.abs(loss/losses)).toFixed(2) : "0.00";
+    document.getElementById("sg").innerText = maxSG;
+    document.getElementById("sl").innerText = maxSL;
+
+    if(chart) chart.destroy();
+
+    chart = new Chart(document.getElementById("grafico"), {
+        type: 'line',
+        data: {
+            labels: arr.map(d=>d[0]),
+            datasets: [
+                {
+                    label: modoAtual === 'pontos' ? 'Equity (Pontos)' : 'Equity (R$)',
+                    data: equity,
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.3
+                },
+                {
+                    label: 'Drawdown',
+                    data: ddArr,
+                    borderColor: '#ef4444',
+                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                    borderWidth: 1,
+                    fill: true,
+                    tension: 0.3
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    grid: { color: '#1f2937' },
+                    ticks: {
+                        color: '#9ca3af',
+                        callback: function(value) {
+                            return modoAtual === 'reais' ? formatCurrency(value) : value;
+                        }
+                    }
+                },
+                x: {
+                    grid: { color: '#1f2937' },
+                    ticks: { color: '#9ca3af' }
+                }
+            },
+            plugins: {
+                legend: { labels: { color: '#e5e7eb' } },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            if (label) label += ': ';
+                            if (modoAtual === 'reais') {
+                                label += formatCurrency(context.parsed.y);
+                            } else {
+                                label += context.parsed.y.toFixed(2);
+                            }
+                            return label;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function filtrar(){
+    let m=mesSelect.value;
+    let ini=document.getElementById("ini").value;
+    let fim=document.getElementById("fim").value;
+
+    let arr=dados;
+
+    if(m!=="todos"){
+        arr=arr.filter(d=>{
+            let [_,mes,ano]=d[0].split('/');
+            return `${mes}/${ano}`===m;
+        });
+    }
+
+    if(ini) arr=arr.filter(d=>parse(d[0])>=new Date(ini));
+    if(fim) arr=arr.filter(d=>parse(d[0])<=new Date(fim));
+
+    render(arr);
+}
+
+render(dados);
 </script>
 
 </body>
